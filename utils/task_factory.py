@@ -1,4 +1,5 @@
-from tasks.connectelec import ConnectElec
+# task_factory.py
+from tasks.motor_planning import MotorPlanning
 
 
 def create_task(config, win):
@@ -14,34 +15,38 @@ def create_task(config, win):
 
     task_name = config["tache"]
 
-    if task_name == "ConnectElec":
+    # ═════════════════════════════════════════════════════════════════════
+    # MotorPlanning
+    # ═════════════════════════════════════════════════════════════════════
+    if task_name == "MotorPlanning":
 
-        return ConnectElec(
+        return MotorPlanning(
             **base_kwargs,
 
-            # ── run selection ──
-            run_type=config.get("run_type", "mapping"),
+            # ── run identification ──
+            effector=config.get("effector", "hand"),
             run_number=config.get("run_number", 1),
 
-            # ── mapping ──
-            n_mapping_blocks=config.get("n_mapping_blocks", 20),
-            mapping_off_jitter=config.get("mapping_off_jitter", 0.0),
+            # ── trial design ──
+            n_trials_per_condition=config.get("n_trials_per_condition", 20),
 
-            # ── prediction ──
-            n_reps_per_condition=config.get("n_reps_per_condition", 5),
+            # ── timing ──
+            preview_duration=config.get("preview_duration", 2.0),
+            cue_duration=config.get("cue_duration", 0.5),
+            plan_duration=config.get("plan_duration", 5.5),
+            plan_jitter=config.get("plan_jitter", 0.5),
+            go_duration=config.get("go_duration", 0.5),
+            execute_duration=config.get("execute_duration", 2.0),
+            iti_duration=config.get("iti_duration", 8.0),
 
-            # ── stimulation timing ──
-            stims_per_finger=config.get("stims_per_finger", 5),
-            stim_interval_ms=config.get("stim_interval_ms", 500.0),
-
-            # ── block timing ──
-            block_on_duration=config.get("block_on_duration", 10.0),
-            block_off_duration=config.get("block_off_duration", 10.0),
-            instruction_duration=config.get("instruction_duration", 5.0),
-            instruction_jitter=config.get("instruction_jitter", 1.0),
+            # ── baselines ──
             initial_baseline=config.get("initial_baseline", 10.0),
+            final_baseline=config.get("final_baseline", 10.0),
+
+            # ── audio ──
+            go_beep_freq=config.get("go_beep_freq", 1000.0),
         )
 
     else:
-        print("Tâche inconnue.")
+        print(f"Tâche inconnue : {task_name}")
         return None
