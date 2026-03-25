@@ -59,7 +59,7 @@ def create_task(config, win):
         return HandRepresentationTask(
             **base_kwargs,
             n_blocks=config.get("n_blocks", 1),
-            trial_duration=config.get("trial_duration", 7.0),
+            trial_duration=config.get("trial_duration", 4.0),
             camera_index=config.get("camera_index", 0),
             handedness=config.get("handedness", "droitier"),
             block_label=config.get("block_label", "Block 1 Pre"),
