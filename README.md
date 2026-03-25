@@ -1,50 +1,86 @@
-# Stimulation Électrique — Somatotopie Digitale & Tâche de Prédiction
+# Hand Representation Task
 
-## Vue d'ensemble
+Tâche de représentation corporelle basée sur le protocole Longo & Haggard (2010).  
+Conçue pour l'évaluation neuropsychologique comportementale — CENIR, Institut du Cerveau (ICM).
 
-Protocole de stimulation électrique digitale en IRMf pour l'étude de la somatotopie corticale et des mécanismes de prédiction sensorielle.
+## Principe
 
-## Protocole
+1. Une image indiquant un doigt et une zone précise apparaît à l'écran
+2. Le participant pointe la zone indiquée **avant la fin de la barre de progression**
+3. Le participant maintient sa position **sans bouger** jusqu'à l'image suivante
+4. Une **photo** est prise automatiquement à la fin de chaque essai
+5. Les images représentent naturellement une **main gauche** — un effet miroir est
+   appliqué automatiquement pour la main droite
 
-### Phase 1 — Finger Mapping
+## Structure
 
-Cartographie somatotopique par block design ON/OFF.
+| Niveau | Quantité | Description |
+|--------|----------|-------------|
+| Block | 1 | 100 essais au total |
+| Miniblock | 10 par block | 10 essais chacun |
+| Essai | 10 par miniblock | Les 10 positions, ordre aléatoire |
 
-| Paramètre              | Valeur par défaut |
-|-------------------------|-------------------|
-| Blocs ON                | 20                |
-| Blocs OFF               | 20                |
-| Durée bloc ON           | 10 s              |
-| Durée bloc OFF          | 10 s ± 5 s       |
-| Doigts stimulés         | D1, D2, D3, D4   |
-| Stims par doigt par bloc| 5                 |
-| Total stims par bloc ON | 20                |
-| ISI (inter-stim)        | 500 ms            |
-| Séquence                | Pseudo-aléatoire  |
-| Durée estimée           | ~6 min 40 s       |
+Les 10 positions couvrent **5 doigts × 2 zones** (proximale / distale).
 
-**Contraintes de séquence :**
-- Pas deux stimulations consécutives sur le même doigt
-- Chaque doigt stimulé exactement 5 fois par bloc ON
+## Paramètres
 
----
+| Paramètre | Défaut | Description |
+|-----------|--------|-------------|
+| `hand` | `droite` | Main testée — `droite` ou `gauche` |
+| `n_blocks` | `1` | Nombre de blocks |
+| `trial_duration` | `7.0` | Durée de la barre de progression (secondes) |
+| `camera_index` | `0` | Index OpenCV de la webcam |
+| `session` | `01` | Numéro de session |
 
-### Phase 2 — Tâche de Prédiction
+## Effet miroir
 
-4 conditions expérimentales, chacune avec la même structure de blocs ON/OFF que le mapping.
+Les images source représentent une main gauche.
 
-| Condition | Code | Doigts | Séquence      | D4              |
-|-----------|------|--------|---------------|-----------------|
-| FP        | 50   | 4      | Prédictible   | Stimulé         |
-| TP        | 51   | 3      | Prédictible   | Omission        |
-| FR        | 52   | 4      | Aléatoire     | Stimulé         |
-| TR        | 53   | 3      | Aléatoire     | Omission        |
+| `hand` | Affichage |
+|--------|-----------|
+| `gauche` | Image telle quelle |
+| `droite` | Image retournée horizontalement |
 
-**Séquence prédictible** : D1 → D2 → D3 → D4 (cyclique)
+## Lancement
 
-**Omission** : Le slot temporel de D4 est préservé (même ISI), aucune stimulation n'est envoyée. Cela permet de mesurer la réponse cérébrale à l'absence d'un stimulus attendu.
+Prérequis
 
-**Pause entre conditions** : 3 min (configurable)
+    Python 3.10+
+    PsychoPy 2025.1.1
+    opencv-python (cv2)
 
-**Durée estimée** : ~35 min (4 conditions × ~7 min + 3 pauses × 3 min)
+Images requises dans `images/` : `a1.png` … `a10.png`  
+(5 doigts × 2 zones, main gauche, fond neutre)
 
+## Données
+
+Les résultats sont sauvegardés dans `data/hand_representation/` :
+
+    *_final.csv              — fichier récapitulatif complet (fin de session)
+    *_incremental.csv        — backup essai par essai (protection anti-crash)
+    photos/                  — photos webcam au format JPEG
+
+### Métriques enregistrées
+
+- Identifiants : `participant`, `session`, `hand`, `flip_horiz`
+- Position : `finger`, `zone`, `position_label`, `image_file`
+- Temporel : `image_onset`, `capture_time_task`, `trial_duration`, `wall_timestamp`
+- Arborescence : `block_number`, `miniblock_number`, `trial_in_miniblock`, `trial_in_block`
+- Photo : `photo_filename`, `photo_path`
+
+### Nomenclature des photos
+
+    {participant}_{hand}_B{block}_M{miniblock}_T{trial}_{finger}_z{zone}_{timestamp}.jpg
+
+    ex : SUJ01_droite_B01_M03_T027_index_z2_20250612_143201_000123.jpg
+
+## Référence
+
+> Longo, M. R., & Haggard, P. (2010).  
+> **An implicit body representation underlying human position sense.**  
+> *Proceedings of the National Academy of Sciences*, 107(26), 11727–11732.  
+> https://doi.org/10.1073/pnas.1003483107
+
+## Auteur
+
+Clément BARBE — CENIR, Institut du Cerveau (ICM), Paris
