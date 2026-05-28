@@ -115,9 +115,16 @@ projet/
 ## Données
 
 ### Nommage des photos
+
+| Type | Format | Exemple |
+|-------|--------|--------|
+| Essai | S{session}_T{trial}_{doigt}_Z{zone}.jpg	S1_T6_ring_Z2.jpg | S1_T6_ring_Z2.jpg |
+| Référence | S{session}_REF{1|2}.jpg | S1_REF1.jpg |
+
 Type	Format	Exemple
 Essai	S{session}_T{trial}_{doigt}_Z{zone}.jpg	S1_T6_ring_Z2.jpg
 Référence	S{session}_REF{1|2}.jpg	S1_REF1.jpg
+
 Métriques enregistrées (CSV)
 
     Identifiants : participant, session, hand, block_number, miniblock_number, global_trial
