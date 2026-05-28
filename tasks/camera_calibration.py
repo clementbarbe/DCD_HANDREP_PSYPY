@@ -3,50 +3,69 @@
 Camera Calibration Task
 =======================
 Lance _calibration_ui.py en subprocess indépendant pour chaque surface.
-Aucune fenêtre PsychoPy n'est créée — win est accepté pour la compatibilité
-de l'API de la factory mais n'est pas utilisé.
+Aucune fenêtre PsychoPy n'est créée.
 
-Sortie : S{session}_{table|plateau}_calibration.json  dans data/CameraCalibration/
+Sortie : S{session}_{table|plateau}_calibration.png  (1920×1080)
+         dans data/CameraCalibration/
 """
 
-import json
 import os
 import sys
+import shutil
 import subprocess
 import tempfile
 
 from utils.logger import get_logger
 
-# Chemin absolu vers le script UI (même dossier que ce fichier)
 _UI_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_calibration_ui.py")
+
+
+def _find_max_camera_index(limit=10):
+    """Teste les index 0..limit et retourne le plus élevé fonctionnel."""
+    import cv2
+    best = -1
+    for idx in range(limit + 1):
+        cap = cv2.VideoCapture(idx)
+        if cap.isOpened():
+            ret, _ = cap.read()
+            if ret:
+                best = idx
+            cap.release()
+    return best
 
 
 class CameraCalibrationTask:
     """Lance la calibration dans un subprocess PyQt6 dédié.
-
-    Aucune dépendance à PsychoPy ou à la fenêtre principale.
-    Chaque surface (table / plateau) ouvre sa propre fenêtre.
+    
+    Sortie : un PNG 1920×1080 par surface (pas de JSON).
+    La caméra avec l'index le plus élevé est automatiquement sélectionnée.
     """
 
     def __init__(
         self,
-        win,            # accepté pour compatibilité factory, non utilisé
+        win,
         nom,
         session="01",
-        camera_index=0,
+        camera_index=-1,
         enregistrer=True,
         **kwargs,
     ):
-        # win volontairement ignoré : pas de fenêtre PsychoPy pour la calibration
-        self.nom          = str(nom)
-        self.session      = str(session)
-        self.camera_index = int(camera_index)
-        self.enregistrer  = enregistrer
-        self.results      = {}
+        self.nom = str(nom)
+        self.session = str(session)
+        self.enregistrer = enregistrer
+        self.results = {}
 
         self.logger = get_logger()
 
-        # Dossier de sauvegarde
+        # Auto-detect max camera index
+        if camera_index < 0:
+            self.camera_index = _find_max_camera_index()
+            if self.camera_index < 0:
+                raise RuntimeError("No camera found.")
+            self.logger.ok(f"Auto-selected camera index: {self.camera_index}")
+        else:
+            self.camera_index = int(camera_index)
+
         _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.data_dir = os.path.join(_root, "data", "CameraCalibration")
         if self.enregistrer:
@@ -56,12 +75,7 @@ class CameraCalibrationTask:
         self.logger.ok("CAMERA CALIBRATION — READY")
         self.logger.ok(f"Participant : {self.nom}  |  Session : {self.session}")
         self.logger.ok(f"Camera index: {self.camera_index}")
-        self.logger.ok(f"UI script   : {_UI_SCRIPT}")
         self.logger.ok("=" * 60)
-
-    # =========================================================================
-    # HELPERS
-    # =========================================================================
 
     @property
     def _session_label(self):
@@ -70,50 +84,25 @@ class CameraCalibrationTask:
         except ValueError:
             return self.session
 
-    def _save_result(self, result):
-        cal_type  = result["calibration_type"]
-        filename  = f"S{self._session_label}_{cal_type}_calibration.json"
-        save_path = os.path.join(self.data_dir, filename)
-        os.makedirs(self.data_dir, exist_ok=True)
-        with open(save_path, "w", encoding="utf-8") as fh:
-            json.dump(result, fh, indent=2, ensure_ascii=False)
-        self.logger.ok(f"Calibration saved → {filename}")
-        return save_path
-
-    # =========================================================================
-    # ENTRY POINT
-    # =========================================================================
-
     def run(self, calibration_types=("table", "plateau"), flip_feed=False):
-        """Lance un subprocess de calibration pour chaque surface.
-
-        Parameters
-        ----------
-        calibration_types : iterable[str]  – 'table', 'plateau', ou les deux
-        flip_feed         : bool           – retourner le flux verticalement
-
-        Returns
-        -------
-        dict  mapping calibration_type → result dict (ou None si annulé)
-        """
+        """Lance un subprocess par surface. Retourne {type: png_path|None}."""
         try:
             for cal_type in calibration_types:
                 self.logger.log(f"Starting calibration: {cal_type.upper()}")
 
-                tmp_path = os.path.join(
+                # Fichier temporaire PNG
+                tmp_png = os.path.join(
                     tempfile.gettempdir(),
-                    f"calibration_{cal_type}_{os.getpid()}.json",
+                    f"calibration_{cal_type}_{os.getpid()}.png",
                 )
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
+                if os.path.exists(tmp_png):
+                    os.unlink(tmp_png)
 
                 cmd = [
                     sys.executable, _UI_SCRIPT,
-                    "--type",    cal_type,
-                    "--camera",  str(self.camera_index),
-                    "--nom",     self.nom,
-                    "--session", self.session,
-                    "--output",  tmp_path,
+                    "--type", cal_type,
+                    "--camera", str(self.camera_index),
+                    "--output", tmp_png,
                 ]
                 if flip_feed:
                     cmd.append("--flip")
@@ -121,20 +110,18 @@ class CameraCalibrationTask:
                 try:
                     proc = subprocess.run(cmd, timeout=600)
 
-                    if proc.returncode == 0 and os.path.exists(tmp_path):
-                        with open(tmp_path, encoding="utf-8") as fh:
-                            result = json.load(fh)
-
-                        hom_ok = "OK" if result.get("homography") else "FAILED"
-                        self.logger.ok(
-                            f"Calibration '{cal_type}' confirmed — "
-                            f"Homography: {hom_ok}."
-                        )
-                        self.results[cal_type] = result
+                    if proc.returncode == 0 and os.path.exists(tmp_png):
+                        self.logger.ok(f"Calibration '{cal_type}' confirmed.")
 
                         if self.enregistrer:
-                            self._save_result(result)
-
+                            fname = f"S{self._session_label}_{cal_type}_calibration.png"
+                            dest = os.path.join(self.data_dir, fname)
+                            os.makedirs(self.data_dir, exist_ok=True)
+                            shutil.copy2(tmp_png, dest)
+                            self.results[cal_type] = dest
+                            self.logger.ok(f"Saved → {fname}")
+                        else:
+                            self.results[cal_type] = tmp_png
                     else:
                         self.logger.warn(
                             f"Calibration '{cal_type}' cancelled "
@@ -147,8 +134,8 @@ class CameraCalibrationTask:
                     self.results[cal_type] = None
 
                 finally:
-                    if os.path.exists(tmp_path):
-                        os.unlink(tmp_path)
+                    if os.path.exists(tmp_png):
+                        os.unlink(tmp_png)
 
             self.logger.ok("Calibration session completed.")
 
