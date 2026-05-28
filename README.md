@@ -112,7 +112,7 @@ projet/
                 ├── …
                 └── S1_REF2.jpg      ← référence finale
 ```
-Données
+## Données
 Nommage des photos
 Type	Format	Exemple
 Essai	S{session}_T{trial}_{doigt}_Z{zone}.jpg	S1_T6_ring_Z2.jpg
@@ -125,7 +125,7 @@ Métriques enregistrées (CSV)
     Fichiers : photo_filename, photo_path
     Métadonnées : flip_horiz, wall_timestamp
 
-Sauvegarde
+## Sauvegarde
 
 Deux fichiers CSV sont produits pour chaque session :
 Fichier	Écriture	Rôle
