@@ -113,7 +113,8 @@ projet/
                 └── S1_REF2.jpg      ← référence finale
 ```
 ## Données
-Nommage des photos
+
+### Nommage des photos
 Type	Format	Exemple
 Essai	S{session}_T{trial}_{doigt}_Z{zone}.jpg	S1_T6_ring_Z2.jpg
 Référence	S{session}_REF{1|2}.jpg	S1_REF1.jpg
