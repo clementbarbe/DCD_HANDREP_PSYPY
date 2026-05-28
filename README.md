@@ -83,7 +83,7 @@ L'interface graphique permet de sélectionner la main, le bloc et de lancer
 la calibration ou la tâche.
 Arborescence
 
-scss
+```scss
 projet/
 ├── main.py                          ← point d'entrée
 ├── Launch.bat                       ← raccourci Windows
@@ -111,7 +111,7 @@ projet/
                 ├── S1_T2_thumb_Z1.jpg
                 ├── …
                 └── S1_REF2.jpg      ← référence finale
-
+```
 Données
 Nommage des photos
 Type	Format	Exemple
