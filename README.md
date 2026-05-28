@@ -21,6 +21,7 @@ est appliqué automatiquement, et les noms de doigts sont inversés anatomiqueme
 
 ## Structure
 
+```scss
 Block (×1 par session)
 ├── REF1 — photo de référence initiale
 ├── 10 miniblocs × 10 positions = 100 essais
@@ -29,7 +30,7 @@ Block (×1 par session)
 │       ├── Capture webcam
 │       └── Retour à la position de base (2 s)
 └── REF2 — photo de référence finale
-
+```
 ## Positions
 
 Chaque essai cible l'une des 10 positions (5 doigts × 2 zones) :
