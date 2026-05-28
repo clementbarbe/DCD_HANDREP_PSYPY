@@ -3,10 +3,9 @@
 Camera Calibration Task
 =======================
 Lance _calibration_ui.py en subprocess indépendant pour chaque surface.
-Aucune fenêtre PsychoPy n'est créée.
 
-Sortie : S{session}_{table|plateau}_calibration.png  (1920×1080)
-         dans data/CameraCalibration/
+Sortie : data/calib/table_YYYYMMDD_HHMMSS.png
+         data/calib/plateau_YYYYMMDD_HHMMSS.png
 """
 
 import os
@@ -14,6 +13,7 @@ import sys
 import shutil
 import subprocess
 import tempfile
+from datetime import datetime
 
 from utils.logger import get_logger
 
@@ -36,8 +36,8 @@ def _find_max_camera_index(limit=10):
 
 class CameraCalibrationTask:
     """Lance la calibration dans un subprocess PyQt6 dédié.
-    
-    Sortie : un PNG 1920×1080 par surface (pas de JSON).
+
+    Sortie : un PNG 1920×1080 par surface dans data/calib/.
     La caméra avec l'index le plus élevé est automatiquement sélectionnée.
     """
 
@@ -67,7 +67,7 @@ class CameraCalibrationTask:
             self.camera_index = int(camera_index)
 
         _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.data_dir = os.path.join(_root, "data", "CameraCalibration")
+        self.data_dir = os.path.join(_root, "data", "calib")
         if self.enregistrer:
             os.makedirs(self.data_dir, exist_ok=True)
 
@@ -75,14 +75,8 @@ class CameraCalibrationTask:
         self.logger.ok("CAMERA CALIBRATION — READY")
         self.logger.ok(f"Participant : {self.nom}  |  Session : {self.session}")
         self.logger.ok(f"Camera index: {self.camera_index}")
+        self.logger.ok(f"Output dir  : {self.data_dir}")
         self.logger.ok("=" * 60)
-
-    @property
-    def _session_label(self):
-        try:
-            return str(int(self.session))
-        except ValueError:
-            return self.session
 
     def run(self, calibration_types=("table", "plateau"), flip_feed=False):
         """Lance un subprocess par surface. Retourne {type: png_path|None}."""
@@ -90,7 +84,6 @@ class CameraCalibrationTask:
             for cal_type in calibration_types:
                 self.logger.log(f"Starting calibration: {cal_type.upper()}")
 
-                # Fichier temporaire PNG
                 tmp_png = os.path.join(
                     tempfile.gettempdir(),
                     f"calibration_{cal_type}_{os.getpid()}.png",
@@ -114,12 +107,12 @@ class CameraCalibrationTask:
                         self.logger.ok(f"Calibration '{cal_type}' confirmed.")
 
                         if self.enregistrer:
-                            fname = f"S{self._session_label}_{cal_type}_calibration.png"
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            fname = f"{cal_type}_{timestamp}.png"
                             dest = os.path.join(self.data_dir, fname)
-                            os.makedirs(self.data_dir, exist_ok=True)
                             shutil.copy2(tmp_png, dest)
                             self.results[cal_type] = dest
-                            self.logger.ok(f"Saved → {fname}")
+                            self.logger.ok(f"Saved → calib/{fname}")
                         else:
                             self.results[cal_type] = tmp_png
                     else:

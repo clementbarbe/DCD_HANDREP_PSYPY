@@ -5,20 +5,10 @@ Hand Representation Task
 Displays finger-position images, captures a webcam photo at the end of each
 trial, and logs all results to a CSV file.
 
-Block structure
----------------
-    1 block  = 100 trials
-    10 miniblocks × 10 positions, each miniblock shuffled independently
-
-Trial sequence
---------------
-    0. Instructions → SPACE → REF1 captured → SPACE → start trials
-    1. Display target image  (horizontally flipped for right hand)
-    2. Fill progress bar over `trial_duration` seconds
-    3. Capture webcam photo
-    4. Show "return to base" for BASE_RETURN_DURATION seconds
-    5. Append row to CSV log
-    6. After all trials: REF2 captured
+Output directory
+----------------
+    data/handrep/ID_{nom}/          ← CSV files
+    data/handrep/ID_{nom}/photos/   ← trial + REF photos
 
 Photo naming
 ------------
@@ -27,17 +17,13 @@ Photo naming
 
 Finger / Zone mapping (source images = LEFT hand)
 --------------------------------------------------
-    Zone 1 : a2  a4  a6  a8  a10   (thumb, index, middle, ring, little)
-    Zone 2 : a1  a3  a5  a7  a9    (thumb, index, middle, ring, little)
-
-Finger inversion on flip (right hand)
---------------------------------------
-    thumb ↔ little  |  index ↔ ring  |  middle → middle
+    Zone 1 : a2  a4  a6  a8  a10
+    Zone 2 : a1  a3  a5  a7  a9
 
 Image orientation
 -----------------
-    hand='gauche' : displayed as-is        (flip_horiz = False)  → left hand
-    hand='droite' : mirrored horizontally  (flip_horiz = True)   → right hand
+    hand='gauche' : displayed as-is        → left hand
+    hand='droite' : mirrored horizontally  → right hand
 """
 
 import os
@@ -58,8 +44,6 @@ IMAGES_DIR = os.path.join(_PROJECT_ROOT, "images")
 class HandRepresentationTask(BaseTask):
     """PsychoPy task: hand-position display and webcam capture."""
 
-    # Zone 1 = a2, a4, a6, a8, a10
-    # Zone 2 = a1, a3, a5, a7, a9
     DEFAULT_POSITIONS = [
         {"label": "thumb_zone2",  "finger": "thumb",  "zone": 2, "image": "a1.png"},
         {"label": "thumb_zone1",  "finger": "thumb",  "zone": 1, "image": "a2.png"},
@@ -83,7 +67,6 @@ class HandRepresentationTask(BaseTask):
         "little": "thumb",
     }
 
-    # Progress bar (normalised coordinates)
     BAR_Y = -0.75
     BAR_LEFT = -0.59
     BAR_MAX_WIDTH = 1.18
@@ -114,12 +97,15 @@ class HandRepresentationTask(BaseTask):
         images_dir=None,
         **kwargs,
     ):
+        # Dossier : data/handrep/ID_{nom}
+        folder_name = os.path.join("handrep", f"ID_{nom}")
+
         super().__init__(
             win=win,
             nom=nom,
             session=session,
             task_name="HandRepresentation",
-            folder_name="hand_representation",
+            folder_name=folder_name,
             eyetracker_actif=False,
             parport_actif=False,
             enregistrer=enregistrer,
@@ -170,7 +156,8 @@ class HandRepresentationTask(BaseTask):
         self.logger.ok(f"Main        : {hand_label}")
         self.logger.ok(f"Blocs       : {self.n_blocks}  |  Durée essai : {self.trial_duration} s")
         self.logger.ok(f"Retour base : {self.BASE_RETURN_DURATION} s")
-        self.logger.ok(f"Images      : {self.images_dir}")
+        self.logger.ok(f"Data dir    : {self.data_dir}")
+        self.logger.ok(f"Photos dir  : {self.photo_dir}")
         self.logger.ok("=" * 60)
 
     def _validate_positions(self):
@@ -405,11 +392,9 @@ class HandRepresentationTask(BaseTask):
     def _capture_photo(self, trial):
         if self.camera is None:
             raise RuntimeError("Webcam is not initialised.")
-
         frame = self._read_camera_frame()
         if frame is None:
             raise RuntimeError("Webcam capture failed after 3 attempts.")
-
         filename = self._build_photo_filename(trial)
         save_path = os.path.join(self.photo_dir, filename)
         if not cv2.imwrite(save_path, frame):
@@ -419,11 +404,9 @@ class HandRepresentationTask(BaseTask):
     def _capture_ref_photo(self, filename):
         if self.camera is None:
             raise RuntimeError("Webcam is not initialised.")
-
         frame = self._read_camera_frame()
         if frame is None:
             raise RuntimeError("Reference capture failed after 3 attempts.")
-
         save_path = os.path.join(self.photo_dir, filename)
         if not cv2.imwrite(save_path, frame):
             raise RuntimeError(f"Could not save reference photo: {save_path}")
@@ -519,7 +502,6 @@ class HandRepresentationTask(BaseTask):
             capture_time=capture_time,
         )
         self._print_trial_summary(trial, capture_time, photo_fn)
-
         self._show_return_to_base()
         self._global_trial_idx += 1
 
