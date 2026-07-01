@@ -15,6 +15,12 @@ Photo naming
     Trial : S1_T6_ring_Z2.jpg
     Ref   : S1_REF1.jpg  /  S1_REF2.jpg
 
+Sequence constraints (per finger)
+---------------------------------
+    3 imposed pairs Z1 → Z2  (consecutive)
+    3 imposed pairs Z2 → Z1  (consecutive)
+    4 isolated Z1 + 4 isolated Z2 (never adjacent to same finger other zone)
+
 Finger / Zone mapping (source images = LEFT hand)
 --------------------------------------------------
     Zone 1 : a2  a4  a6  a8  a10
@@ -34,6 +40,7 @@ from datetime import datetime
 from psychopy import visual, core, event
 
 from utils.base_task import BaseTask
+from tasks.sequence_generator import generate_sequence
 
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -44,18 +51,19 @@ IMAGES_DIR = os.path.join(_PROJECT_ROOT, "images")
 class HandRepresentationTask(BaseTask):
     """PsychoPy task: hand-position display and webcam capture."""
 
-    DEFAULT_POSITIONS = [
-        {"label": "thumb_zone2",  "finger": "thumb",  "zone": 2, "image": "a1.png"},
-        {"label": "thumb_zone1",  "finger": "thumb",  "zone": 1, "image": "a2.png"},
-        {"label": "index_zone2",  "finger": "index",  "zone": 2, "image": "a3.png"},
-        {"label": "index_zone1",  "finger": "index",  "zone": 1, "image": "a4.png"},
-        {"label": "middle_zone2", "finger": "middle", "zone": 2, "image": "a5.png"},
-        {"label": "middle_zone1", "finger": "middle", "zone": 1, "image": "a6.png"},
-        {"label": "ring_zone2",   "finger": "ring",   "zone": 2, "image": "a7.png"},
-        {"label": "ring_zone1",   "finger": "ring",   "zone": 1, "image": "a8.png"},
-        {"label": "little_zone2", "finger": "little", "zone": 2, "image": "a9.png"},
-        {"label": "little_zone1", "finger": "little", "zone": 1, "image": "a10.png"},
-    ]
+    # Image mapping: (finger, zone) → image file
+    IMAGE_MAP = {
+        ("thumb",  2): "a1.png",
+        ("thumb",  1): "a2.png",
+        ("index",  2): "a3.png",
+        ("index",  1): "a4.png",
+        ("middle", 2): "a5.png",
+        ("middle", 1): "a6.png",
+        ("ring",   2): "a7.png",
+        ("ring",   1): "a8.png",
+        ("little", 2): "a9.png",
+        ("little", 1): "a10.png",
+    }
 
     BACKGROUND_COLOR = [0, 0, 0]
 
@@ -93,11 +101,10 @@ class HandRepresentationTask(BaseTask):
         camera_index=1,
         hand="droite",
         enregistrer=True,
-        positions=None,
         images_dir=None,
+        sequence_seed=None,
         **kwargs,
     ):
-        # Dossier : data/handrep/ID_{nom}
         folder_name = os.path.join("handrep", f"ID_{nom}")
 
         super().__init__(
@@ -116,6 +123,7 @@ class HandRepresentationTask(BaseTask):
         self.trial_duration = float(trial_duration)
         self.camera_index = int(camera_index)
         self.images_dir = images_dir or IMAGES_DIR
+        self.sequence_seed = sequence_seed
 
         self.hand = hand.lower().strip()
         if self.hand not in ("droite", "gauche"):
@@ -123,7 +131,6 @@ class HandRepresentationTask(BaseTask):
 
         self.flip_horiz = self.hand == "droite"
 
-        self.positions = positions if positions is not None else self.DEFAULT_POSITIONS
         self.global_records = []
         self.camera = None
         self._global_trial_idx = 0
@@ -134,9 +141,8 @@ class HandRepresentationTask(BaseTask):
 
         self.win.color = self.BACKGROUND_COLOR
 
-        self._validate_positions()
-        self._setup_stimuli()
         self._preload_images()
+        self._setup_stimuli()
         self._init_incremental_file()
         self._log_startup()
 
@@ -156,20 +162,20 @@ class HandRepresentationTask(BaseTask):
         self.logger.ok(f"Main        : {hand_label}")
         self.logger.ok(f"Blocs       : {self.n_blocks}  |  Durée essai : {self.trial_duration} s")
         self.logger.ok(f"Retour base : {self.BASE_RETURN_DURATION} s")
+        self.logger.ok(f"Séquence    : contrainte (3×Z1Z2 + 3×Z2Z1 + 4 isolés par doigt)")
+        self.logger.ok(f"Seed        : {self.sequence_seed}")
         self.logger.ok(f"Data dir    : {self.data_dir}")
         self.logger.ok(f"Photos dir  : {self.photo_dir}")
         self.logger.ok("=" * 60)
 
-    def _validate_positions(self):
-        if len(self.positions) != 10:
-            raise ValueError(
-                f"Expected exactly 10 positions, got {len(self.positions)}."
-            )
-        required = {"label", "finger", "zone", "image"}
-        for i, pos in enumerate(self.positions):
-            missing = required - set(pos.keys())
-            if missing:
-                raise ValueError(f"Position {i} is missing fields: {missing}")
+    def _preload_images(self):
+        """Resolve and validate every image path."""
+        self.loaded_images = {}
+        for (finger, zone), img_file in self.IMAGE_MAP.items():
+            img_path = os.path.join(self.images_dir, img_file)
+            if not os.path.exists(img_path):
+                raise FileNotFoundError(f"Image not found: {img_path}")
+            self.loaded_images[(finger, zone)] = img_path
 
     def _setup_stimuli(self):
         self.image_stim = visual.ImageStim(
@@ -211,14 +217,6 @@ class HandRepresentationTask(BaseTask):
             height=0.08,
             wrapWidth=1.8,
         )
-
-    def _preload_images(self):
-        self.loaded_images = {}
-        for pos in self.positions:
-            img_path = os.path.join(self.images_dir, pos["image"])
-            if not os.path.exists(img_path):
-                raise FileNotFoundError(f"Image not found: {img_path}")
-            self.loaded_images[pos["label"]] = img_path
 
     # =========================================================================
     # HELPERS
@@ -279,25 +277,33 @@ class HandRepresentationTask(BaseTask):
             self.camera = None
 
     # =========================================================================
-    # BLOCK DESIGN
+    # SEQUENCE GENERATION
     # =========================================================================
 
     def _build_block_trials(self, block_idx):
+        """Generate 100 constrained trials for one block."""
+        sequence = generate_sequence(seed=self.sequence_seed)
+
         trials = []
-        for miniblock_idx in range(10):
-            miniblock_positions = self.positions.copy()
-            random.shuffle(miniblock_positions)
-            for trial_in_miniblock, pos in enumerate(miniblock_positions):
-                trials.append({
-                    "block_idx": block_idx,
-                    "miniblock_idx": miniblock_idx,
-                    "trial_in_miniblock": trial_in_miniblock,
-                    "trial_in_block": len(trials),
-                    "position_label": pos["label"],
-                    "finger": pos["finger"],
-                    "zone": pos["zone"],
-                    "image_file": pos["image"],
-                })
+        for i, item in enumerate(sequence):
+            finger = item["finger"]
+            zone = item["zone"]
+            image_file = self.IMAGE_MAP[(finger, zone)]
+
+            trials.append({
+                "block_idx": block_idx,
+                "trial_in_block": i,
+                "finger": finger,
+                "zone": zone,
+                "pair_type": item["pair_type"],
+                "image_file": image_file,
+                "position_label": f"{finger}_zone{zone}",
+            })
+
+        self.logger.ok(
+            f"Block {block_idx + 1}: sequence generated "
+            f"({len(trials)} trials, seed={self.sequence_seed})"
+        )
         return trials
 
     # =========================================================================
@@ -440,15 +446,12 @@ class HandRepresentationTask(BaseTask):
             "flip_horiz": self.flip_horiz,
             "block_idx": trial["block_idx"],
             "block_number": trial["block_idx"] + 1,
-            "miniblock_idx": trial["miniblock_idx"],
-            "miniblock_number": trial["miniblock_idx"] + 1,
-            "trial_in_miniblock": trial["trial_in_miniblock"],
             "trial_in_block": trial["trial_in_block"],
             "global_trial": self._global_trial_idx + 1,
-            "position_label": trial["position_label"],
             "finger_source": trial["finger"],
             "finger_displayed": self._get_displayed_finger(trial["finger"]),
             "zone": trial["zone"],
+            "pair_type": trial["pair_type"],
             "image_file": trial["image_file"],
             "image_path": image_path,
             "photo_filename": photo_filename,
@@ -463,12 +466,13 @@ class HandRepresentationTask(BaseTask):
 
     def _print_trial_summary(self, trial, capture_time, photo_filename):
         displayed_finger = self._get_displayed_finger(trial["finger"])
+        pair_tag = trial["pair_type"][:3].upper()
         print(
             f"  B{trial['block_idx'] + 1:02d} "
-            f"M{trial['miniblock_idx'] + 1:02d} "
-            f"T{self._global_trial_idx + 1:04d} | "
+            f"T{self._global_trial_idx + 1:03d} | "
             f"{self.hand[0].upper()} | "
-            f"{displayed_finger} z{trial['zone']} | "
+            f"{displayed_finger:<8} Z{trial['zone']} | "
+            f"{pair_tag} | "
             f"t={capture_time:7.3f} s | "
             f"{photo_filename}"
         )
@@ -477,8 +481,8 @@ class HandRepresentationTask(BaseTask):
     # TRIAL & BLOCK
     # =========================================================================
 
-    def run_trial(self, trial, total_trials):
-        image_path = self.loaded_images[trial["position_label"]]
+    def run_trial(self, trial):
+        image_path = self.loaded_images[(trial["finger"], trial["zone"])]
         onset = self.task_clock.getTime()
         trial_clock = core.Clock()
 
@@ -522,7 +526,7 @@ class HandRepresentationTask(BaseTask):
         )
 
         for trial in trials:
-            self.run_trial(trial, len(trials))
+            self.run_trial(trial)
 
         ref2_fn = self._build_ref_photo_filename(2)
         self._capture_ref_with_countdown(
