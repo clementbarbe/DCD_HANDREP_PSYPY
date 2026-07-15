@@ -53,16 +53,16 @@ class HandRepresentationTask(BaseTask):
 
     # Image mapping: (finger, zone) → image file
     IMAGE_MAP = {
-        ("thumb",  2): "a1.png",
-        ("thumb",  1): "a2.png",
-        ("index",  2): "a3.png",
-        ("index",  1): "a4.png",
+        ("little", 2): "a1.png",
+        ("little", 1): "a2.png",
+        ("ring",   2): "a3.png",
+        ("ring",   1): "a4.png",
         ("middle", 2): "a5.png",
         ("middle", 1): "a6.png",
-        ("ring",   2): "a7.png",
-        ("ring",   1): "a8.png",
-        ("little", 2): "a9.png",
-        ("little", 1): "a10.png",
+        ("index",  2): "a7.png",
+        ("index",  1): "a8.png",
+        ("thumb",  2): "a9.png",
+        ("thumb",  1): "a10.png",
     }
 
     BACKGROUND_COLOR = [0, 0, 0]
